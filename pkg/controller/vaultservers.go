@@ -133,7 +133,7 @@ func (c *VaultController) runVaultServerFinalizer(vs *api.VaultServer) error {
 	//    - Delete All but Keep PVC, Secrets
 	//  - Delete
 	//    - Delete All but Keep Secrets
-	//  - WipeOut (add ownerReference to vault-keys secret, so that it also gets deleted)
+	//  - WipeOut
 	//    - Delete All
 	//  - DoNotTerminate
 	//    - Stop terminating using the webhook if kubectl delete is applied
@@ -157,17 +157,95 @@ func (c *VaultController) runVaultServerFinalizer(vs *api.VaultServer) error {
 }
 
 func (c *VaultController) wipeOut(vs *api.VaultServer) error {
-	// Todo: wipeOut will delete the vault-keys too, so ensure owner reference first
+	// Todo: wipeOut will delete everything (vault-keys will not be deleted, must be deleted by the user)
+	//  - Ensure OwnerReference to PVCs, Secrets
+
+	if err := c.EnsureOwnerReferencePVC(vs); err != nil {
+		return err
+	}
+
+	if err := c.EnsureOwnerReferenceSecrets(vs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *VaultController) halt(vs *api.VaultServer) error {
+	// Todo: Halt will delete all but keep the PVCs & Secrets
+	//  - Remove OwnerReference from Secrets (PVCs does not have Owner Reference)
+
+	if err := c.RemoveOwnerReferenceSecrets(vs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *VaultController) delete(vs *api.VaultServer) error {
+	// Todo: Delete will delete everything but keep the secrets
+	//  - Ensure Owner Reference to PVCs
+	//  - Remove Owner Reference from Secrets
+
+	if err := c.EnsureOwnerReferencePVC(vs); err != nil {
+		return err
+	}
+
+	if err := c.RemoveOwnerReferenceSecrets(vs); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *VaultController) doNotTerminate(vs *api.VaultServer) error {
+	klog.Infof("terminationPolicy: %s, %s/%s", vs.Spec.TerminationPolicy, vs.Namespace, vs.Name)
+	return nil
+}
+
+func (c *VaultController) EnsureOwnerReferencePVC(vs *api.VaultServer) error {
+	// get the list options using the LabelSelector
 	listOptions := metav1.ListOptions{
 		LabelSelector: labels.Set(vs.OffshootLabels()).String(),
 		Limit:         100,
 	}
 
+	// Get the PVCs list using the List options, RBAC permission must be enabled to List, Get etc.
+	pvcList, err := c.kubeClient.CoreV1().PersistentVolumeClaims(vs.Namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return errors.Wrapf(err, "error in getting pvcs list using the listOptions")
+	}
+
+	// Iterate over the PVC lists and Ensure Owner Reference from each item.
+	for _, pvc := range pvcList.Items {
+		klog.Infof("pvc found: %s/%s", pvc.Name, pvc.Namespace)
+		_, _, err = core_util.CreateOrPatchPVC(context.TODO(), c.kubeClient, pvc.ObjectMeta,
+			func(in *core.PersistentVolumeClaim) *core.PersistentVolumeClaim {
+				core_util.EnsureOwnerReference(&in.ObjectMeta, metav1.NewControllerRef(vs, api.SchemeGroupVersion.WithKind(api.ResourceKindVaultServer)))
+				return in
+			}, metav1.PatchOptions{})
+		if err != nil {
+			return errors.Wrap(err, "failed to add owner reference to the PVCs")
+		}
+	}
+
+	return nil
+}
+
+func (c *VaultController) EnsureOwnerReferenceSecrets(vs *api.VaultServer) error {
+	// get the list options using the LabelSelector
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(vs.OffshootLabels()).String(),
+		Limit:         100,
+	}
+
+	// Get the Secrets list using the List options, RBAC permission must be enabled to List, Get etc.
 	secretList, err := c.kubeClient.CoreV1().Secrets(vs.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return errors.Wrapf(err, "error in getting secrets list using the listOptions")
 	}
 
+	// Iterate over the Secret lists and Ensure Owner Reference from each item.
 	for _, secret := range secretList.Items {
 		klog.Infof("secret found: %s/%s", secret.Name, secret.Namespace)
 		_, _, err = core_util.CreateOrPatchSecret(context.TODO(), c.kubeClient, secret.ObjectMeta,
@@ -181,41 +259,22 @@ func (c *VaultController) wipeOut(vs *api.VaultServer) error {
 	}
 
 	return nil
-	//Todo: get the secret & print the value
-	//sr, err := c.kubeClient.CoreV1().Secrets(vs.Namespace).Get(context.TODO(), "vault-keys", metav1.GetOptions{})
-	//klog.Info("======== wipeout :) =========")
-	//if kerrors.IsNotFound(err) {
-	//	return errors.Wrapf(err, "secret not found")
-	//} else if err != nil {
-	//	return errors.Wrapf(err, "failed to get secret")
-	//}
-	//
-	//if sr.Data == nil {
-	//	return errors.Wrapf(err, "sr.Data is nil, key not found in secret data")
-	//}
-	//
-	//if value, ok := sr.Data["vault-root-token"]; ok {
-	//	klog.Info("Value of [vault-root-token]: ", string(value))
-	//	return nil
-	//} else {
-	//	return errors.Wrapf(err, "key not found in secret data")
-	//}
 }
 
-func (c *VaultController) halt(vs *api.VaultServer) error {
-	// Todo: Halt will delete all but keep the PVCs & Secrets
-
-	// Removing owner reference from the secrets as we want to keep them
+func (c *VaultController) RemoveOwnerReferenceSecrets(vs *api.VaultServer) error {
+	// get the list options using the LabelSelector
 	listOptions := metav1.ListOptions{
 		LabelSelector: labels.Set(vs.OffshootLabels()).String(),
 		Limit:         100,
 	}
 
+	// Get the Secrets list using the List options, RBAC permission must be enabled to List, Get etc.
 	secretList, err := c.kubeClient.CoreV1().Secrets(vs.Namespace).List(context.TODO(), listOptions)
 	if err != nil {
 		return errors.Wrapf(err, "error in getting secrets list using the listOptions")
 	}
 
+	// Iterate over the Secret lists and Remove Owner Reference from each item.
 	for _, secret := range secretList.Items {
 		klog.Infof("secret found: %s/%s", secret.Name, secret.Namespace)
 		_, _, err = core_util.CreateOrPatchSecret(context.TODO(), c.kubeClient, secret.ObjectMeta,
@@ -229,14 +288,6 @@ func (c *VaultController) halt(vs *api.VaultServer) error {
 		}
 	}
 
-	return nil
-}
-
-func (c *VaultController) delete(vs *api.VaultServer) error {
-	return nil
-}
-
-func (c *VaultController) doNotTerminate(vs *api.VaultServer) error {
 	return nil
 }
 
