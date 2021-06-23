@@ -143,13 +143,13 @@ func (c *VaultController) runVaultServerFinalizer(vs *api.VaultServer) error {
 
 	switch {
 	case vs.Spec.TerminationPolicy == api.TerminationPolicyHalt:
-		return nil
+		return c.halt(vs)
 	case vs.Spec.TerminationPolicy == api.TerminationPolicyDelete:
-		return nil
+		return c.delete(vs)
 	case vs.Spec.TerminationPolicy == api.TerminationPolicyWipeOut:
 		return c.wipeOut(vs)
 	case vs.Spec.TerminationPolicy == api.TerminationPolicyDoNotTerminate:
-		return nil
+		return c.doNotTerminate(vs)
 	default:
 		klog.Infof("Vault Server Termination Policy Not Set/Found for %s/%s", vs.Namespace, vs.Name)
 	}
@@ -200,6 +200,44 @@ func (c *VaultController) wipeOut(vs *api.VaultServer) error {
 	//} else {
 	//	return errors.Wrapf(err, "key not found in secret data")
 	//}
+}
+
+func (c *VaultController) halt(vs *api.VaultServer) error {
+	// Todo: Halt will delete all but keep the PVCs & Secrets
+
+	// Removing owner reference from the secrets as we want to keep them
+	listOptions := metav1.ListOptions{
+		LabelSelector: labels.Set(vs.OffshootLabels()).String(),
+		Limit:         100,
+	}
+
+	secretList, err := c.kubeClient.CoreV1().Secrets(vs.Namespace).List(context.TODO(), listOptions)
+	if err != nil {
+		return errors.Wrapf(err, "error in getting secrets list using the listOptions")
+	}
+
+	for _, secret := range secretList.Items {
+		klog.Infof("secret found: %s/%s", secret.Name, secret.Namespace)
+		_, _, err = core_util.CreateOrPatchSecret(context.TODO(), c.kubeClient, secret.ObjectMeta,
+			func(in *core.Secret) *core.Secret {
+				// RemoveOwnerReference(dependent, owner) -> (secret, vault server)
+				core_util.RemoveOwnerReference(in, vs)
+				return in
+			}, metav1.PatchOptions{})
+		if err != nil {
+			return errors.Wrap(err, "failed to remove owner reference to the secrets")
+		}
+	}
+
+	return nil
+}
+
+func (c *VaultController) delete(vs *api.VaultServer) error {
+	return nil
+}
+
+func (c *VaultController) doNotTerminate(vs *api.VaultServer) error {
+	return nil
 }
 
 // reconcileVault reconciles the vault cluster's state to the spec specified by v
