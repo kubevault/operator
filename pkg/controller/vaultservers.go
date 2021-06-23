@@ -148,8 +148,6 @@ func (c *VaultController) runVaultServerFinalizer(vs *api.VaultServer) error {
 		return c.delete(vs)
 	case vs.Spec.TerminationPolicy == api.TerminationPolicyWipeOut:
 		return c.wipeOut(vs)
-	case vs.Spec.TerminationPolicy == api.TerminationPolicyDoNotTerminate:
-		return c.doNotTerminate(vs)
 	default:
 		klog.Infof("Vault Server Termination Policy Not Set/Found for %s/%s", vs.Namespace, vs.Name)
 	}
@@ -195,11 +193,6 @@ func (c *VaultController) delete(vs *api.VaultServer) error {
 		return err
 	}
 
-	return nil
-}
-
-func (c *VaultController) doNotTerminate(vs *api.VaultServer) error {
-	klog.Infof("terminationPolicy: %s, %s/%s", vs.Spec.TerminationPolicy, vs.Namespace, vs.Name)
 	return nil
 }
 
