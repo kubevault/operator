@@ -28,6 +28,7 @@ import (
 	engine_listers "kubevault.dev/apimachinery/client/listers/engine/v1alpha1"
 	vault_listers "kubevault.dev/apimachinery/client/listers/kubevault/v1alpha1"
 	policy_listers "kubevault.dev/apimachinery/client/listers/policy/v1alpha1"
+	amc "kubevault.dev/apimachinery/pkg/controller"
 
 	pcm "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned/typed/monitoring/v1"
 	auditlib "go.bytebuilders.dev/audit/lib"
@@ -47,7 +48,7 @@ import (
 )
 
 type VaultController struct {
-	config
+	amc.Config
 	clientConfig *rest.Config
 
 	// ctxCancels stores vault clusters' contexts that are used to

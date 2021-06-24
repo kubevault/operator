@@ -24,8 +24,11 @@ import (
 	"kubevault.dev/apimachinery/apis/kubevault"
 	"kubevault.dev/apimachinery/crds"
 
+	"k8s.io/apimachinery/pkg/labels"
+	appslister "k8s.io/client-go/listers/apps/v1"
 	kmapi "kmodules.xyz/client-go/api/v1"
 	"kmodules.xyz/client-go/apiextensions"
+	apps_util "kmodules.xyz/client-go/apps/v1"
 	"kmodules.xyz/client-go/meta"
 	meta_util "kmodules.xyz/client-go/meta"
 	mona "kmodules.xyz/monitoring-agent-api/api/v1"
@@ -211,4 +214,27 @@ func (v *VaultServer) GetBackendCertsName(cert string) (string, error) {
 		return filepath.Join("/etc/vault/tls/storage/", cert), nil
 	}
 	return "", nil
+}
+
+func (v *VaultServer) ReplicasAreReady(lister appslister.StatefulSetLister) (bool, string, error) {
+	// Desire number of statefulSets
+	expectedItems := 1
+	if v.Spec.Replicas != nil {
+		expectedItems = int(*v.Spec.Replicas)
+	}
+	return checkReplicas(lister.StatefulSets(v.Namespace), labels.SelectorFromSet(v.OffshootLabels()), expectedItems)
+}
+
+func checkReplicas(lister appslister.StatefulSetNamespaceLister, selector labels.Selector, expectedItems int) (bool, string, error) {
+	items, err := lister.List(selector)
+	if err != nil {
+		return false, "", err
+	}
+	if len(items) < expectedItems {
+		return false, fmt.Sprintf("All StatefulSets are not available. Desire number of StatefulSet: %d, Available: %d", expectedItems, len(items)), nil
+	}
+
+	// return isReplicasReady, message, error
+	ready, msg := apps_util.StatefulSetsAreReady(items)
+	return ready, msg, nil
 }

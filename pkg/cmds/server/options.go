@@ -21,13 +21,21 @@ import (
 	"time"
 
 	cs "kubevault.dev/apimachinery/client/clientset/versioned"
+	kubevaultinformers "kubevault.dev/apimachinery/client/informers/externalversions"
+	sts "kubevault.dev/apimachinery/pkg/controller/statefulset"
 	"kubevault.dev/operator/pkg/controller"
 	"kubevault.dev/operator/pkg/docker"
+	"kubevault.dev/operator/pkg/eventer"
 
 	prom "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned/typed/monitoring/v1"
 	"github.com/spf13/pflag"
+	core "k8s.io/api/core/v1"
 	crd_cs "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/client-go/informers"
+	coreinformers "k8s.io/client-go/informers/core/v1"
 	"k8s.io/client-go/kubernetes"
+	corelisters "k8s.io/client-go/listers/core/v1"
+	"k8s.io/client-go/tools/cache"
 	"kmodules.xyz/client-go/tools/clusterid"
 	appcat_cs "kmodules.xyz/custom-resources/client/clientset/versioned/typed/appcatalog/v1alpha1"
 )
@@ -80,12 +88,12 @@ func (s *ExtraOptions) ApplyTo(cfg *controller.Config) error {
 	var err error
 
 	cfg.LicenseFile = s.LicenseFile
-	cfg.DockerRegistry = s.DockerRegistry
 	cfg.MaxNumRequeues = s.MaxNumRequeues
 	cfg.NumThreads = s.NumThreads
 	cfg.ResyncPeriod = s.ResyncPeriod
 	cfg.ClientConfig.QPS = float32(s.QPS)
 	cfg.ClientConfig.Burst = s.Burst
+	cfg.WatchNamespace = core.NamespaceAll
 	cfg.EnableMutatingWebhook = s.EnableMutatingWebhook
 	cfg.EnableValidatingWebhook = s.EnableValidatingWebhook
 
@@ -104,5 +112,26 @@ func (s *ExtraOptions) ApplyTo(cfg *controller.Config) error {
 	if cfg.AppCatalogClient, err = appcat_cs.NewForConfig(cfg.ClientConfig); err != nil {
 		return err
 	}
+	if cfg.VSClient, err = cs.NewForConfig(cfg.ClientConfig); err != nil {
+		return err
+	}
+
+	cfg.KubeInformerFactory = informers.NewSharedInformerFactory(cfg.KubeClient, cfg.ResyncPeriod)
+	cfg.KubevaultInformerFactory = kubevaultinformers.NewSharedInformerFactory(cfg.VSClient, cfg.ResyncPeriod)
+	cfg.SecretInformer = cfg.KubeInformerFactory.InformerFor(&core.Secret{}, func(client kubernetes.Interface, resyncPeriod time.Duration) cache.SharedIndexInformer {
+		return coreinformers.NewSecretInformer(
+			client,
+			cfg.WatchNamespace,
+			resyncPeriod,
+			cache.Indexers{cache.NamespaceIndex: cache.MetaNamespaceIndexFunc},
+		)
+	})
+	cfg.SecretLister = corelisters.NewSecretLister(cfg.SecretInformer.GetIndexer())
+	// Create event recorder
+	cfg.Recorder = eventer.NewEventRecorder(cfg.KubeClient, "VaultServer operator")
+
+	// Initialize StatefulSet watcher
+	sts.NewController(&cfg.Config, cfg.KubeClient, cfg.VSClient, cfg.DynamicClient).InitStsWatcher()
+
 	return nil
 }

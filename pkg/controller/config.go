@@ -20,16 +20,18 @@ import (
 	"time"
 
 	cs "kubevault.dev/apimachinery/client/clientset/versioned"
-	db_cs "kubevault.dev/apimachinery/client/clientset/versioned"
 	vaultinformers "kubevault.dev/apimachinery/client/informers/externalversions"
+	amc "kubevault.dev/apimachinery/pkg/controller"
 	"kubevault.dev/operator/pkg/eventer"
 
 	pcm "github.com/prometheus-operator/prometheus-operator/pkg/client/versioned/typed/monitoring/v1"
 	auditlib "go.bytebuilders.dev/audit/lib"
 	crd_cs "k8s.io/apiextensions-apiserver/pkg/client/clientset/clientset"
+	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
+	"k8s.io/client-go/tools/record"
 	reg_util "kmodules.xyz/client-go/admissionregistration/v1beta1"
 	"kmodules.xyz/client-go/discovery"
 	"kmodules.xyz/client-go/tools/cli"
@@ -52,7 +54,7 @@ type config struct {
 }
 
 type Config struct {
-	config
+	amc.Config
 
 	LicenseFile      string
 	ClientConfig     *rest.Config
@@ -61,7 +63,9 @@ type Config struct {
 	CRDClient        crd_cs.Interface
 	AppCatalogClient appcat_cs.AppcatalogV1alpha1Interface
 	PromClient       pcm.MonitoringV1Interface
-	DbClient         db_cs.Interface
+	VSClient         cs.Interface
+	Recorder         record.EventRecorder
+	DynamicClient    dynamic.Interface
 }
 
 func NewConfig(clientConfig *rest.Config) *Config {
@@ -92,7 +96,6 @@ func (c *Config) New() (*VaultController, error) {
 	}
 
 	ctrl := &VaultController{
-		config:              c.config,
 		clientConfig:        c.ClientConfig,
 		ctxCancels:          make(map[string]CtxWithCancel),
 		finalizerInfo:       NewMapFinalizer(),

@@ -19,7 +19,6 @@ require (
 	github.com/hashicorp/go-cleanhttp v0.5.1
 	github.com/hashicorp/vault/api v1.1.0
 	github.com/hashicorp/vault/sdk v0.2.0
-	github.com/kr/pretty v0.2.1 // indirect
 	github.com/lib/pq v1.10.1
 	github.com/ncw/swift v1.0.52
 	github.com/onsi/ginkgo v1.16.4
@@ -35,7 +34,6 @@ require (
 	go.bytebuilders.dev/license-verifier v0.9.2
 	go.bytebuilders.dev/license-verifier/kubernetes v0.9.2
 	golang.org/x/oauth2 v0.0.0-20210210192628-66670185b0cd
-	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
 	gomodules.xyz/blobfs v0.1.7
 	gomodules.xyz/cert v1.2.0
 	gomodules.xyz/go-sh v0.1.0
@@ -62,7 +60,7 @@ require (
 	kmodules.xyz/monitoring-agent-api v0.0.0-20210618110729-9cd872c66513
 	kmodules.xyz/offshoot-api v0.0.0-20210618005544-5217a24765da
 	kmodules.xyz/webhook-runtime v0.0.0-20210618013329-0accb929102b
-	kubevault.dev/apimachinery v0.0.0-20210621123526-76c9b38a3982
+	kubevault.dev/apimachinery v0.0.0-20210624102122-98f27002c1b1
 )
 
 replace bitbucket.org/ww/goautoneg => gomodules.xyz/goautoneg v0.0.0-20120707110453-a547fc61f48d

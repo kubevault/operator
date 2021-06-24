@@ -67,3 +67,44 @@ const (
 	VaultAuthLDAPUsers  = "users"
 	VaultAuthJWTRole    = "role"
 )
+
+// Resource kind related constants
+const (
+	ResourceKindStatefulSet = "StatefulSet"
+)
+
+// List of possible condition types for a KubeVault object
+const (
+	// used for Vaultserver that have started provisioning
+	VaultserverProvisioningStarted = "ProvisioningStarted"
+	// used for Vaultserver which completed provisioning
+	VaultserverProvisioned = "Provisioned"
+	// used for Vaultserver that are currently being initialized using stash
+	VaultserverDataRestoreStarted = "DataRestoreStarted"
+	// used for Vaultserver that have been initialized using stash
+	VaultserverDataRestored = "DataRestored"
+	// used for Vaultserver whose pods are ready
+	VaultserverReplicaReady = "ReplicaReady"
+	// used for Vaultserver that are currently accepting connection
+	VaultserverAcceptingConnection = "AcceptingConnection"
+	// used for Vaultserver that report status OK (also implies that we can connect to it)
+	VaultserverReady = "Ready"
+	// used for Vaultserver that are paused
+	VaultserverPaused = "Paused"
+	// used for Vaultserver that are halted
+	VaultserverHalted = "Halted"
+
+	// Condition reasons
+	DataRestoreStartedByExternalInitializer    = "DataRestoreStartedByExternalInitializer"
+	VaultserverSuccessfullyRestored            = "SuccessfullyDataRestored"
+	FailedToRestoreData                        = "FailedToRestoreData"
+	AllReplicasAreReady                        = "AllReplicasReady"
+	SomeReplicasAreNotReady                    = "SomeReplicasNotReady"
+	VaultserverAcceptingConnectionRequest      = "VaultserverAcceptingConnectionRequest"
+	VaultserverNotAcceptingConnectionRequest   = "VaultserverNotAcceptingConnectionRequest"
+	ReadinessCheckSucceeded                    = "ReadinessCheckSucceeded"
+	ReadinessCheckFailed                       = "ReadinessCheckFailed"
+	VaultserverProvisioningStartedSuccessfully = "VaultserverProvisioningStartedSuccessfully"
+	VaultserverSuccessfullyProvisioned         = "VaultserverSuccessfullyProvisioned"
+	VaultserverHaltedSuccessfully              = "VaultserverHaltedSuccessfully"
+)
