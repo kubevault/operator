@@ -25,7 +25,6 @@ import (
 
 	vaultapi "github.com/hashicorp/vault/api"
 	core "k8s.io/api/core/v1"
-	"k8s.io/klog/v2"
 )
 
 const (
@@ -66,19 +65,11 @@ func GetListenerConfig(mountPath string, isTLSEnabled bool) string {
 
 func NewVaultClient(hostname string, port string, tlsConfig *vaultapi.TLSConfig) (*vaultapi.Client, error) {
 	cfg := vaultapi.DefaultConfig()
-	klog.Info("TLSConfig() => value of TLS Insecure: ", tlsConfig.Insecure)
-	podURL := fmt.Sprintf("%s://%s:%s", Scheme(tlsConfig.Insecure), hostname, port)
+	podURL := fmt.Sprintf("https://%s:%s", hostname, port)
 	cfg.Address = podURL
 	err := cfg.ConfigureTLS(tlsConfig)
 	if err != nil {
 		return nil, err
 	}
 	return vaultapi.NewClient(cfg)
-}
-
-func Scheme(tlsInsecure bool) string {
-	if tlsInsecure {
-		return "http"
-	}
-	return "https"
 }

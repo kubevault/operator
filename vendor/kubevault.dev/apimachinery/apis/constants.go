@@ -69,5 +69,5 @@ const (
 )
 
 const (
-	CertificatePath = "/etc/vault/tls"
+	CertificatePath = "/etc/vault/tls/"
 )
