@@ -77,7 +77,7 @@ type VaultCertificateAlias string
 
 const (
 	VaultCACert      VaultCertificateAlias = "ca"
-	VaultServerCert  VaultCertificateAlias = "server"
+	VaultServerCert  VaultCertificateAlias = ""
 	VaultClientCert  VaultCertificateAlias = "client"
 	VaultStorageCert VaultCertificateAlias = "storage"
 )
